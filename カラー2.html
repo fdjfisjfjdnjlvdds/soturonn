@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ストレスチェックシステム</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f0f0f0;
+        }
+        .container {
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            background-color: white;
+            border-radius: 10px;
+            width: 350px;
+        }
+        button {
+            margin: 5px;
+            padding: 10px;
+            cursor: pointer;
+        }
+    </style>
+    <!-- Chart.jsのCDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h1>ストレスチェック</h1>
+    <h3>1. 今の気分に合う色を選んでください</h3>
+    <div>
+        <button onclick="setColor('青')">青</button>
+        <button onclick="setColor('赤')">赤</button>
+        <button onclick="setColor('緑')">緑</button>
+        <button onclick="setColor('黄色')">黄色</button>
+        <button onclick="setColor('紫')">紫</button>
+        <button onclick="setColor('オレンジ')">オレンジ</button>
+        <button onclick="setColor('ピンク')">ピンク</button>
+        <button onclick="setColor('茶色')">茶色</button>
+        <button onclick="setColor('黒')">黒</button>
+        <button onclick="setColor('白')">白</button>
+    </div>
+
+    <h3>2. 気分を表すオノマトペを選んでください</h3>
+    <div>
+        <button onclick="setOnomatopoeia('スッキリ')">スッキリ</button>
+        <button onclick="setOnomatopoeia('モヤモヤ')">モヤモヤ</button>
+        <button onclick="setOnomatopoeia('ワクワク')">ワクワク</button>
+        <button onclick="setOnomatopoeia('グッタリ')">グッタリ</button>
+        <button onclick="setOnomatopoeia('ドキドキ')">ドキドキ</button>
+        <button onclick="setOnomatopoeia('フワフワ')">フワフワ</button>
+        <button onclick="setOnomatopoeia('イライラ')">イライラ</button>
+        <button onclick="setOnomatopoeia('ボーッと')">ボーッと</button>
+        <button onclick="setOnomatopoeia('ウキウキ')">ウキウキ</button>
+        <button onclick="setOnomatopoeia('ホッと')">ホッと</button>
+    </div>
+
+    <h3>結果</h3>
+    <p id="result"></p>
+    <p id="stressLevel"></p>
+    <p id="recommendation"></p>
+    <button onclick="reset()">リセット</button>
+</div>
+
+<div class="container">
+    <h2>一日のストレス推移</h2>
+    <canvas id="stressChart" width="300" height="200"></canvas>
+</div>
+
+<script>
+    let selectedColor = '';
+    let selectedOnomatopoeia = '';
+    const stressData = [];
+    const labels = [];
+
+    function setColor(color) {
+        selectedColor = color;
+        checkResult();
+    }
+
+    function setOnomatopoeia(onomatopoeia) {
+        selectedOnomatopoeia = onomatopoeia;
+        checkResult();
+    }
+
+    function checkResult() {
+        const resultField = document.getElementById('result');
+        const stressLevelField = document.getElementById('stressLevel');
+        const recommendationField = document.getElementById('recommendation');
+
+        if (selectedColor && selectedOnomatopoeia) {
+            const result = getResult();
+            resultField.textContent = result.message;
+            stressLevelField.textContent = `ストレス度合い: ${result.stressLevel}%`;
+            recommendationField.innerHTML = getRecommendation(result.stressLevel);
+
+            // ストレスデータを追加
+            recordStressData(result.stressLevel);
+        }
+    }
+
+    function getResult() {
+        const combinations = {
+            '青スッキリ': { message: '心が落ち着いています。', stressLevel: 10 },
+            '青モヤモヤ': { message: '少し不安定な気持ちです。', stressLevel: 30 },
+            '青ワクワク': { message: '新しいことに挑戦したい気持ちがあります。', stressLevel: 20 },
+            '青グッタリ': { message: '疲れているけれど、落ち着いています。', stressLevel: 40 },
+            '赤スッキリ': { message: 'エネルギーが満ちています。', stressLevel: 10 },
+            '赤モヤモヤ': { message: '不安や焦りを感じています。', stressLevel: 60 },
+            '赤ワクワク': { message: '情熱的で新しいことに挑戦したいです。', stressLevel: 20 },
+            '赤グッタリ': { message: 'エネルギーは高いけれど、疲れを感じています。', stressLevel: 40 },
+            '緑スッキリ': { message: '心のバランスが取れています。', stressLevel: 10 },
+            '緑モヤモヤ': { message: 'バランスを欠いていると感じています。', stressLevel: 40 },
+            '緑ワクワク': { message: 'リラックスしつつ、新しい発見があります。', stressLevel: 20 },
+            '緑グッタリ': { message: '癒しを求めている状態です。', stressLevel: 50 },
+            '黄色スッキリ': { message: '明るい気持ちで、活力があります。', stressLevel: 10 },
+            '黄色モヤモヤ': { message: '明るいが、不安を感じています。', stressLevel: 30 },
+            '黄色ワクワク': { message: 'エネルギッシュで、楽しい気持ち。', stressLevel: 20 },
+            '黄色グッタリ': { message: '疲れを感じつつも、笑顔を保っています。', stressLevel: 40 },
+            '紫ドキドキ': { message: '刺激が多く、期待と不安が混じった気持ち。', stressLevel: 35 },
+            '紫フワフワ': { message: '創造的な気持ちで心地よく漂っています。', stressLevel: 15 },
+            '茶色ホッと': { message: '安定感と安心感に包まれています。', stressLevel: 10 },
+            'オレンジウキウキ': { message: 'ポジティブで元気いっぱいの状態です。', stressLevel: 15 },
+            '黒イライラ': { message: 'ストレスが高まっている状態です。', stressLevel: 70 },
+            '白ボーッと': { message: '何も考えたくない気分です。', stressLevel: 40 }
+        };
+
+        const key = `${selectedColor}${selectedOnomatopoeia}`;
+        return combinations[key] || { message: '他の組み合わせを試してみてください。', stressLevel: 0 };
+    }
+
+    function getRecommendation(stressLevel) {
+        if (stressLevel <= 20) {
+            return "リラックスした状態ですので、<b>コーヒーやお酒</b>を少量楽しむのもおすすめです！<br>心地よい気分を保ちながら、ほっと一息つきましょう。";
+        } else if (stressLevel <= 40) {
+            return "少し疲れがたまっているようです。<b>ハーブティーや軽いスイーツ</b>で気分転換しましょう。<br>甘さや香りを楽しみながらリラックスするのもいいですね。";
+        } else if (stressLevel <= 60) {
+            return "ややストレスを感じているようです。<b>チョコレートやスナック</b>で気分をほぐすのはいかがでしょう？<br>お気に入りの味を楽しみながら、少しずつエネルギーを回復しましょう。";
+        } else {
+            return "<b>ストレスが高まっています。</b><br>この際、好きなものを自由に楽しんでください！<br>甘いものやスナック、ちょっとしたお酒など、自分をリラックスさせる嗜好品を楽しんでリフレッシュしましょう。";
+        }
+    }
+
+    function recordStressData(stressLevel) {
+        const currentTime = new Date().toLocaleTimeString();
+        labels.push(currentTime);
+        stressData.push(stressLevel);
+        updateChart();
+    }
+
+    function reset() {
+        selectedColor = '';
+        selectedOnomatopoeia = '';
+        document.getElementById('result').textContent = '';
+        document.getElementById('stressLevel').textContent = '';
+        document.getElementById('recommendation').textContent = '';
+    }
+
+    // Chart.jsを使用してストレスレベルのグラフを作成
+    const ctx = document.getElementById('stressChart').getContext('2d');
+    const stressChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'ストレス度',
+                data: stressData,
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 2,
+                fill: false
+            }]
+        },
+        options: {
+            scales: {
+                x: { display: true, title: { display: true, text: '時間' } },
+                y: { display: true, title: { display: true, text: 'ストレス度 (%)' }, min: 0, max: 100 }
+            }
+        }
+    });
+
+    function updateChart() {
+        stressChart.update();
+    }
+</script>
+
+</body>
+</html>
